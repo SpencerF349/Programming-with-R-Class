@@ -1,0 +1,312 @@
+---
+title: "Dynamic Documents and R Basics"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+<!--
+Shiny doesn't reset the state of the tutorial after use. The state information is stored here: 
+file.path(rappdirs::user_data_dir(), "R", "learnr","tutorial","storage")
+
+Exercises can be setup to have answers that are checked automatically.
+Go to https://rstudio.github.io/learnr/index.html for more information.
+-->
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Objective
+The goal of this document is to introduce you to the basics of R and Markdown. To provide you with some examples of basic usage of R Markdown documents and to point out how these documents meet the goals of Reproducible Data Science. At this point we are just getting use to using and reading R Markdown files. 
+
+## Markdown
+
+### What is Markdown?
+An easy, readable way to convert text to html. See [John Gruber](https://daringfireball.net/projects/markdown/) for a full description and some basic syntax. Markdown allows you to stick with text files only philosophy but still format notes, papers and presentations without having to labor with html syntax.
+
+**Getting Help:** Under the Help menu you will be able to access a R Markdown cheat sheet that will appear under the Help tab and the [R Markdown Reference Guide](https://rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf). For more information go to [R Markdown](https://rmarkdown.rstudio.com).
+
+### Setup RStudio
+Markdown is fully integrated with RStudio. To install the R Markdown package run `install.package('rmarkdown')` in the Console or under the package tab use Install.
+
+RStudio helps you to render several kinds of basic documents including html, MS Word and PDF, as well as, articles, blogs, books, dashboards and interactive documents like this one. If you have not installed LaTex the easiest way to make PDF documents with RStudio is to install [TinyTex](https://yihui.org/tinytex/)
+
+## Dynamic Documents
+Combining R with Markdown enables the running of analyses, the generating of statistics, tables and plots along side formatted introductions, methods and discussions realizing many of the main objectives of Reproducible Data Science. Instead of having to do an analysis and then write it up or cut and paste statistics and figures from an analysis into a report, article, or presentation, the analysis and the interpretation can reside in the same document which can be dynamically updated. In statistics in  the text as well as figures and tables can be code updating automatically with changes to data. This combining of code with communication makes programming more literate, that is readable. Instead of having to read code and comments to discern meaning and method, code is contextualized by the surrounding document.
+
+### Anatomy of a R Markdown Document
+There are three components to an R Markdown document: metadata, text and code. The metadata is at the head of the document between a pair of three dashes `---`. The metadata is written in [YAML(YAML Ain't Markup Language)](https://en.wikipedia.org/wiki/YAML). The metadata is followed by the body of the document that contains both text and code. The syntax for the text is Markdown. There are two basic types of code inline starting with`` `r `` and ending with`` ` `` and code chunks starting with `` ```{r} `` with r indicating the language and ending with three backticks`` ``` ``.   
+
+#### Metadata
+Metadata contains information about the document like title and author. It can include functions like get the current date:
+```{r eval=FALSE, echo=TRUE}
+date:  "`r format(Sys.Date(),'%m/%d/%Y')`"
+```
+It also indicates what type of file is to be generated. YAML is a readable way of telling the computer how to store information and is similar to XML in terms of use. Indentation matters in YAML syntax see [Appendix B2](https://bookdown.org/yihui/bookdown/r-markdown.html) for an example.
+
+#### Text
+All basic formatting features offered by word processors can be accessed in a Markdown file. Headers, lists, bold and italics are easy to use. However, the goal of Markdown is more to focus on the text not on the formatting. The document won't look like it is intended to till it is rendered (or in language of R Markdown knit). 
+
+#### Code
+RStudio does provide syntax highlighting for code making it more readable. Code and text can be intermixed in a R Markdown file. For example, you can run R inline with text. Today's date is `r format(Sys.Date(),'%m/%d/%Y')`. Larger chunks of code can be separate from text in a code chunk. These code chunks can be used to run multi-step analyses or to produce plots and tables. Comments can be added to chunks and the code in chunks can be hidden or echoed in the knitted document. It is important to remember that code is run from lower line numbers to higher and thus what is coded at the start of a document can influence what happens at the end. Code chunks offer several options including whether or not to store objects generated by the code into memory that can be accessed by later code. As we use code chunks in various contexts we will encounter many of these options.
+```{r echo=TRUE}
+# This is an example of a code chunk
+# Comments like this should be used to describe what the code does
+# Or to make note of something important about the code
+# Excessive comments make code less readable
+# If you find yourself having to explain too much in the comments
+# Rethink the way you are coding and the labels being used
+# The code should be readable
+
+
+```
+
+```{r PlotNoCorr, echo=FALSE, message=FALSE}
+# Transforms Y so that it is correlated to degree rho with X
+# This method is using the QR Decomposition which is used to obtain Least Squares estimates
+# In the context of regression
+# It is essentially projecting Y onto X to the degree rho
+# This method is exact
+
+# Don't worry about how this works unless you have taken Linear Algebra
+# And you know about the QR Decomposition
+
+# In order to estimate the density for the joint distribution of x and y
+# I will need the function bkde2D() in the KernSmooth package
+require(KernSmooth)
+
+make.corXY <- function(x,y,rho){
+  n <- length(x)
+  theta<- acos(rho)
+  XY <- scale(cbind(x,y),center=TRUE,scale=FALSE)
+  I <- diag(n)
+  Q <- qr.Q(qr(XY[,1,drop=FALSE]))
+  P <- tcrossprod(Q)
+  y2x  <- (I-P) %*% XY[ , 2]               
+  x2y  <- cbind(XY[ , 1], y2x)              
+  Z    <- x2y %*% diag(1/sqrt(colSums(x2y^2)))
+  corY <- Z[ , 2] + (1 / tan(theta)) * Z[ , 1]
+  return(cbind(x,corY))
+}
+
+x <- scale(rnorm(1000),center=TRUE,scale=FALSE)
+y <- scale(rnorm(1000),center=TRUE,scale=FALSE)
+
+plot(x,y, xlab="X",ylab = "Y",pch=20,col=rgb(24,116,205,180,maxColorValue = 255))
+
+est <- bkde2D(cbind(x,y), bandwidth = c(0.7,0.7))
+
+contour(est[[1]],est[[2]],est[[3]],col=rgb(16,78,139,maxColorValue = 255),drawlabels=FALSE,add=TRUE)
+```
+
+```{r PlotCorr, echo=FALSE}
+XW <- make.corXY(x,y,.75)
+
+plot(XW, xlab="X",ylab = "Y",pch=20,col=rgb(24,116,205,180,maxColorValue = 255))
+
+est <- bkde2D(XW, bandwidth = c(0.7,.03))
+
+contour(est[[1]],est[[2]],est[[3]],col=rgb(16,78,139,maxColorValue = 255),drawlabels=FALSE,add=TRUE)
+```
+
+## R Language
+
+Analyzing data includes interacting with data, visualizing structure in data, modeling the structure, and selecting a model, making a decision or an inference. R can help. R is an interactive environment designed for manipulating data, calculation and graphical display. It is a real programming language that has been developed by a community of experts to facilitate rigorous, modern data analysis.  
+
+### What is R?
+R is designed to analyze data. Data analysis is interactive. It involves asking questions and finding answers in an incremental stepwise fashion. R is designed for quick access to sophisticated information. This information is available for further computation. R makes it easy to think with and through data by focusing on the analysis not on the computation. Even though R is designed so that you don’t have to understand the underlying computations, a little programming goes a long way. Understanding how to use R as a programming language makes coding more efficient, reliable, literate and usable making it possible to understand complex and varied data. 
+
+R has elements of Object-Oriented Programming (OOP) and elements of Functional Programming (FP). OOP is an improvement over Procedural Programming (think SAS) in which procedures and methods are coded to perform operations on data. OOP is about creating objects that contain both data and methods. This focus on objects makes the structure of programs more clear, helps to keep code DRY "Don't Repeat Yourself", and makes the code easier to maintain, modify and debug. OOP has a class and method structure in which the classes define types of objects (think fruits and apples) and methods are determined by the object's class. Objects have attributes (just like apples have a color, taste, size etc.). The structure of OOP is the same as that of everyday thinking, one just has to learn the classes and methods.
+
+```{r echo=TRUE}
+methods(plot)
+```
+
+The function `plot` changes what it does depending on the type of object it is plotting. In R, the focus is on *what to do* not *how to do*. In this way R is FP. Two main characteristics of FP are a focus on *what* and not the *how* of computation and adherence to a pure mathematical function style. R implements both these characteristics. In pure FP languages (e.g., LISP, Haskell), everything is a function (or expression) there aren't variable statements making programming not data focused. Haskell does interact with R and it can be used to efficiently code demanding tasks. R differs from these pure languages in its data focus. Just like in pure FP, functions in R can act on other functions. Interacting with R involves working with functions which are well defined, generic actions. A helpful way to leverage both the FP and OOP aspects of R is to think of functions as verbs and objects as nouns.
+
+### Anatomy of a function call
+The main way of interacting with R is through function calls.
+
+<div style="text-align: center;"> 
+<p style="font-size:125%"><span style="color:#619bd3">function.name</span>(<span style="color:#d43939">arguments</span>)</p>
+</div>
+
+Each function has a list of arguments. The arguments can be referenced by order or by name. The arguments specify the action of the function including on what object the function is to act. Objects in R can be functions or vectors, matrices, lists, data frames etc. Coding with R means creating, manipulating, modifying, and examining objects by name.
+
+Operators in R are just convenient short hand for function calls.
+
+<div style="text-align: center;"> 
+<p style="font-size:125%">2 + 3 same as ‘+’(2,3)</p>
+</div>
+
+```{r echo=FALSE}
+formalArgs(rnorm)
+formalArgs(plot)
+```
+
+The `plot` function can have two objects (x and y coordinates) as well as many specifications of the form of the plot. The `rnorm` function generates n samples from a normal distribution with location `mean` and dispersion `sd`.
+
+## Basic R
+The following exercises are intended to provide a very basic introduction to R. These exercises focus on interactions with the R Console in RStudio. **All questions are welcome.**
+
+### Exercise: Where am I? 
+
+**When working with R where you are in your computer's file system is important to know. All execution of code in R is done from within a working directory. The working directory is the origin point for specifing where R is to find files or write files.**
+
+Use a function to get the working directory (Note: The answer will not be your project folder):
+
+```{r wd, exercise=TRUE}
+
+```
+
+### Exercise: Vectors
+
+**Vectors are a basic data structure in R. There are several ways of creating vectors and knowing them can help in lots of coding tasks.**
+
+Create the vector (1,2,3,4,5,6,7,8,9,10) 4 different ways:
+
+```{r vecCreate, exercise=TRUE, exercise.lines = 5}
+
+```
+
+```{r vecCreate-hint}
+1:10 
+c(1,2,3,4,5,6,7,8,9,10)
+rep(1:10,each=1)
+seq(1,10,1)
+```
+
+### Exercise: Vector Computation
+
+**Computation in R is whole object therefore iterative methods like those used in Matlab can be mostly avoided. Instead of thinking about how to add two vectors, the focus can be on adding vectors**
+
+Create a vector like in the previous exercise assign it a name and perform all basic operations on it:
+
+```{r vecComp, exercise=TRUE, exercise.lines = 8}
+
+```
+
+```{r vecComp-hint}
+x <- 1:10
+x+5
+x+x
+2*x
+x/2
+x^2
+```
+
+### Exercise: Custom Function: Mean
+
+**R has many built in useful functions. However, analyzing data requires coding functions and scripts just like communication requires more than single words or phrases. The purpose of this exercise is to further introduce basic R and to practice rudimentary coding.**
+
+Write a function that calculates the mean of a vector. (Note: To create a custom function, function() needs to be called.)
+
+```{r mean, exercise=TRUE, exercise.lines = 8}
+
+```
+
+```{r mean-hint}
+# Calculates the mean of a vector 
+# length() gets the number of elements in a vector
+# sum() adds up all the elements in a vector
+# return() says what the object the function will return in this case the sum divided by the number data points (the mean)
+# Is the return() function need???
+
+MyMean <- function(x){ # only one argument needed, the data
+	n <- length(x) 
+	# x is a local variable meaning the vector passed to the function when the function is called will be used where ever x appears in the expression
+	# x has no meaning outside of the function
+	mean <- sum(x)/n 
+	return(mean)	
+}
+```
+
+### Exercise: Custom Function: Standard Deviation
+
+Write a function that implements the following function.
+$$
+s = \sqrt{\frac{\sum\limits_{i=1}^n (x_i -\bar{x})^2}{n-1}}
+$$
+```{r std, exercise=TRUE, exercise.lines = 10}
+
+```
+
+```{r std-hint}
+# What is each line of code doing?
+# Is return() needed?
+
+MySD <- function(x){
+ n <- length(x)
+ SS <- sum((x-mean(x))^2)
+ var <- SS/(n-1)
+ sd <- sqrt(var)
+ return(sd)
+}
+
+```
+
+### Exercise: Custom Function: Median (Optional)
+
+Write a function that calculates the median of a vector. Do not use the 50th percentile. Check your function against median(). (Hint: Use %%.)
+
+```{r median, exercise=TRUE, exercise.lines = 15}
+
+```
+
+```{r median-hint}
+# This function introduces [ ]
+# These square brackets are used to subset objects like vectors, matrices, data frames
+# x[1] where x is a vector means get the first element of x
+# x[x>5] means get all elements of x that are greater than 5
+
+MyMedian <- function(x){
+	x <-sort(x)
+	n <- length(x)
+	if(n %% 2 == 0){
+		return(sum(c(x[n/2],x[(n/2)+1]))/2)
+	}
+	else {
+		return(x[(n+1)/2])
+	}
+}
+```
+
+## What have you learned?
+
+Some questions to verify that the previous exercises were useful:
+
+```{r quiz}
+quiz(
+  question("Which function would return the location of the working directory",
+    answer("where()"),
+    answer("getwd(home)"),
+    answer("getwd()", correct = TRUE),
+    answer("getProject()")
+  ),
+  question("Which of the following generating a vector with 3 elements",
+    answer("1:3", correct = TRUE),
+    answer("rep(1:3,3)"),
+    answer("seq(1,3,.5)"),
+    answer("seq(-1,1,1)", correct = TRUE)
+  ),
+  question("c(1,2,3) + c(3,2,1) returns which of the following?",
+    answer("c(4,4,4)", correct = TRUE),
+    answer("c(4,3,2)"),
+    answer("c(4,5,6)"),
+    answer("c(3,4,5)")
+  ),
+  question("sum(1:3) returns which of the following?",
+    answer("c(3)"),
+    answer("c(6)", correct = TRUE),
+    answer("c(9)"),
+    answer("c(1)")
+  ),
+  question("Which function returns the number of elements in numeric vector x?",
+    answer("nstr(x)"),
+    answer("n(x)"),
+    answer("length(x)", correct = TRUE),
+    answer("nchar(x)")
+  )
+)
+```
+
